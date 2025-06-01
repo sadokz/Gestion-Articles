@@ -215,4 +215,74 @@ Once the backend is running, visit `http://localhost:8000/docs` for interactive 
 - `PUT /api/sous-categories/{id}` - Update subcategory
 - `DELETE /api/sous-categories/{id}` - Delete subcategory
 
-## ��️ Project Structure 
+## 🔒 Authentication Features
+
+### Backend API Endpoints
+
+- `POST /api/auth/register` - Register a new user
+- `POST /api/auth/login` - Login user and get JWT token
+- `GET /api/auth/me` - Get current user information (protected)
+- `GET /api/auth/users` - Get all users (protected)
+
+### Frontend Features
+
+- **Login Page** (`/login`) - User authentication
+- **Register Page** (`/register`) - User registration
+- **Protected Routes** - Automatic redirect to login for unauthenticated users
+- **Navigation** - User menu with logout functionality
+- **Auth Context** - Global authentication state management
+
+### User Model
+
+```typescript
+interface User {
+  id: number;
+  email: string;
+  nom: string;
+  prenom: string;
+  is_active: boolean;
+}
+```
+
+### Database Schema
+
+The authentication system adds a `users` table:
+
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    hashed_password TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Security Features
+
+- Password hashing using bcrypt
+- JWT tokens with expiration
+- Protected API endpoints
+- Secure token storage in localStorage
+- Automatic token validation
+
+## 🚀 Usage
+
+1. Start both backend and frontend servers
+2. Navigate to `http://localhost:5173`
+3. You'll be redirected to the login page
+4. Create a new account using the "S'inscrire" link
+5. After registration, you'll be automatically logged in
+6. Access the protected article management features
+
+## 📝 Development Notes
+
+- The authentication context manages login state globally
+- Protected routes automatically redirect unauthenticated users
+- JWT tokens are stored in localStorage and validated on app startup
+- The navigation component shows user information and logout option
+- All API calls include authentication headers when a token is available
+
+## ️ Project Structure 

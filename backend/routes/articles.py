@@ -8,6 +8,7 @@ from models import Article, ArticleCreate
 router = APIRouter()
 UPLOAD_DIR = "uploads"
 
+
 @router.post("/", response_model=Article)
 async def create_article(
     titre: str = Form(...),
@@ -17,7 +18,7 @@ async def create_article(
     categorie: str = Form(...),
     sous_categorie: str = Form(...),
     date_rappel: str = Form(""),
-    file: UploadFile = File(None)
+    file: UploadFile = File(None),
 ):
     filename = None
     if file:
@@ -27,13 +28,24 @@ async def create_article(
             f.write(await file.read())
 
     conn = await connect()
-    row = await conn.fetchrow("""
+    row = await conn.fetchrow(
+        """
         INSERT INTO articles (titre, prix, unite, description, categorie, sous_categorie, date_rappel, piece_jointe)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *;
-    """, titre, prix, unite, description, categorie, sous_categorie, date_rappel, filename)
+    """,
+        titre,
+        prix,
+        unite,
+        description,
+        categorie,
+        sous_categorie,
+        date_rappel,
+        filename,
+    )
     await conn.close()
     return dict(row)
+
 
 @router.get("/", response_model=List[Article])
 async def list_articles():
@@ -41,6 +53,7 @@ async def list_articles():
     rows = await conn.fetch("SELECT * FROM articles;")
     await conn.close()
     return [dict(r) for r in rows]
+
 
 @router.get("/{article_id}", response_model=Article)
 async def get_article(article_id: int):
@@ -51,20 +64,31 @@ async def get_article(article_id: int):
         raise HTTPException(status_code=404, detail="Article not found")
     return dict(row)
 
+
 @router.put("/{article_id}", response_model=Article)
 async def update_article(article_id: int, data: ArticleCreate):
     conn = await connect()
-    row = await conn.fetchrow("""
+    row = await conn.fetchrow(
+        """
         UPDATE articles SET
             titre=$1, prix=$2, unite=$3, description=$4,
             categorie=$5, sous_categorie=$6, date_rappel=$7
         WHERE id=$8 RETURNING *;
-    """, data.titre, data.prix, data.unite, data.description,
-          data.categorie, data.sous_categorie, data.date_rappel, article_id)
+    """,
+        data.titre,
+        data.prix,
+        data.unite,
+        data.description,
+        data.categorie,
+        data.sous_categorie,
+        data.date_rappel,
+        article_id,
+    )
     await conn.close()
     if not row:
         raise HTTPException(status_code=404, detail="Article not found")
     return dict(row)
+
 
 @router.delete("/{article_id}")
 async def delete_article(article_id: int):
@@ -72,6 +96,7 @@ async def delete_article(article_id: int):
     await conn.execute("DELETE FROM articles WHERE id=$1;", article_id)
     await conn.close()
     return {"message": "Deleted"}
+
 
 @router.get("/download/{filename}")
 async def download_file(filename: str):

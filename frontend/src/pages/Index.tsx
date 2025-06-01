@@ -1,53 +1,15 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { LoginModal } from '../components/LoginModal';
 import { Dashboard } from '../components/Dashboard';
-import { DatabaseService } from '../services/DatabaseService';
-import { ExtendedUser } from '../types/User';
-import { LogIn } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { LogIn, UserPlus } from 'lucide-react';
+import { LoginModal } from '../components/LoginModal';
+import { RegisterModal } from '../components/RegisterModal';
 
 const Index = () => {
-  const [user, setUser] = useState<ExtendedUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isLoading, isAuthenticated } = useAuth();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-
-  useEffect(() => {
-    const initializeDatabase = async () => {
-      try {
-        await DatabaseService.initialize();
-        // Vérifier si l'utilisateur est déjà connecté (stocké en session)
-        const storedUser = sessionStorage.getItem('currentUser');
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          // Vérifier si le compte est toujours actif
-          const authenticatedUser = await DatabaseService.authenticateUser(userData.username, userData.password || 'temp');
-          if (authenticatedUser) {
-            setUser(authenticatedUser);
-          } else {
-            // Compte inactif ou supprimé, nettoyer la session
-            sessionStorage.removeItem('currentUser');
-          }
-        }
-      } catch (error) {
-        console.error('Erreur lors de l\'initialisation de la base de données:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeDatabase();
-  }, []);
-
-  const handleLogin = (userData: ExtendedUser) => {
-    setUser(userData);
-    sessionStorage.setItem('currentUser', JSON.stringify(userData));
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    sessionStorage.removeItem('currentUser');
-  };
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -57,15 +19,23 @@ const Index = () => {
     );
   }
 
-  if (user) {
-    return <Dashboard user={user} onLogout={handleLogout} />;
+  if (isAuthenticated && user) {
+    return <Dashboard user={user} />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-orange-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Header avec bouton de connexion */}
+      {/* Header avec boutons de connexion et inscription */}
       <header className="w-full p-4">
-        <div className="max-w-7xl mx-auto flex justify-end">
+        <div className="max-w-7xl mx-auto flex justify-end space-x-4">
+          <Button
+            onClick={() => setIsRegisterModalOpen(true)}
+            variant="outline"
+            className="border-orange-500 text-orange-600 hover:bg-orange-50 font-medium px-6 py-2 transition-all duration-200"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            S'inscrire
+          </Button>
           <Button
             onClick={() => setIsLoginModalOpen(true)}
             className="bg-orange-500 hover:bg-orange-600 text-white font-medium px-6 py-2 transition-all duration-200"
@@ -103,8 +73,8 @@ const Index = () => {
             Nous fournissons des solutions professionnelles d'ingénierie électrique adaptées pour répondre à vos besoins et défis spécifiques.
           </p>
 
-          {/* Bouton d'action optionnel */}
-          <div className="space-y-4">
+          {/* Boutons d'action */}
+          <div className="space-x-4 space-y-4">
             <Button
               onClick={() => setIsLoginModalOpen(true)}
               size="lg"
@@ -112,15 +82,26 @@ const Index = () => {
             >
               Accéder au système de gestion
             </Button>
+            <Button
+              onClick={() => setIsRegisterModalOpen(true)}
+              size="lg"
+              variant="outline"
+              className="border-orange-500 text-orange-600 hover:bg-orange-50 font-medium px-8 py-3 text-lg transition-all duration-200"
+            >
+              Créer un compte
+            </Button>
           </div>
         </div>
       </main>
 
-      {/* Modal de connexion */}
+      {/* Modals de connexion et inscription */}
       <LoginModal
         isOpen={isLoginModalOpen}
         onClose={() => setIsLoginModalOpen(false)}
-        onLogin={handleLogin}
+      />
+      <RegisterModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
       />
     </div>
   );

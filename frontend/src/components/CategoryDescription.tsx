@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { DatabaseService } from '../services/DatabaseService';
+import { getCategories, getSousCategories } from '../api';
 import { Categorie, SousCategorie } from '../types/Article';
+import { useAuth } from '../contexts/AuthContext';
 import { Info } from 'lucide-react';
 
 interface CategoryDescriptionProps {
@@ -14,22 +14,27 @@ export const CategoryDescription: React.FC<CategoryDescriptionProps> = ({
   selectedCategory,
   selectedSousCategory
 }) => {
+  const { token } = useAuth();
   const [categoryInfo, setCategoryInfo] = useState<Categorie | null>(null);
   const [sousCategoryInfo, setSousCategoryInfo] = useState<SousCategorie | null>(null);
 
   useEffect(() => {
-    loadCategoryInfo();
-  }, [selectedCategory, selectedSousCategory]);
+    if (token) {
+      loadCategoryInfo();
+    }
+  }, [selectedCategory, selectedSousCategory, token]);
 
   const loadCategoryInfo = async () => {
+    if (!token) return;
+
     try {
       if (selectedCategory && selectedCategory !== 'all') {
-        const categories = await DatabaseService.getCategories();
+        const categories = await getCategories(token);
         const category = categories.find(cat => cat.nom === selectedCategory);
         setCategoryInfo(category || null);
 
         if (selectedSousCategory && selectedSousCategory !== 'all') {
-          const sousCategories = await DatabaseService.getSousCategories();
+          const sousCategories = await getSousCategories(token);
           const sousCategory = sousCategories.find(sc => sc.nom === selectedSousCategory);
           setSousCategoryInfo(sousCategory || null);
         } else {
@@ -65,7 +70,7 @@ export const CategoryDescription: React.FC<CategoryDescriptionProps> = ({
                 </p>
               </div>
             )}
-            
+
             {sousCategoryInfo && (
               <div className="border-t border-blue-200 dark:border-blue-700 pt-2">
                 <h4 className="font-medium text-blue-800 dark:text-blue-200">

@@ -14,9 +14,10 @@ import { TableView } from './TableView';
 import { AdvancedSearch } from './AdvancedSearch';
 import { StatisticsDashboard } from './StatisticsDashboard';
 import { ExportModal } from './ExportModal';
-import { ApiService } from '../services/ApiService';
 import { Article, Categorie, SousCategorie, Statistiques, RechercheAvancee } from '../types/Article';
-import { ExtendedUser } from '../types/User';
+import { User } from '../types/User';
+import { useAuth } from '../contexts/AuthContext';
+import { getArticles, getCategories, getSousCategories, createArticle, updateArticle, deleteArticle } from '../api';
 import { useToast } from '@/hooks/use-toast';
 import {
   Plus,
@@ -36,15 +37,15 @@ import {
   Grid3X3,
   List,
   FileText,
-  Calendar
+  Calendar,
+  Shield,
+  Package
 } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-interface DashboardProps {
-  user: ExtendedUser;
-  onLogout: () => void;
-}
-
-export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
+export const Dashboard: React.FC = () => {
+  const { user, logout, hasPermission, hasRole, token } = useAuth();
   const [articles, setArticles] = useState<Article[]>([]);
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [sousCategories, setSousCategories] = useState<SousCategorie[]>([]);
@@ -85,13 +86,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
   const { toast } = useToast();
 
-  // Vérifier les permissions
-  const canModify = user.niveau_acces === 'lecture_modification';
-  const isAdmin = user.username === 'admin';
+  // Determine permissions based on role
+  const canViewArticles = hasPermission('articles.read') || hasRole('viewer');
+  const canModifyArticles = hasPermission('articles.update') || hasPermission('articles.create');
+  const canDeleteArticles = hasPermission('articles.delete');
+  const canManageCategories = hasPermission('categories.create') || hasPermission('categories.update');
+  const canManageUsers = hasPermission('users.read') || hasRole('admin') || hasRole('super_admin');
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (canViewArticles) {
+      loadData();
+    }
+  }, [canViewArticles]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -117,9 +123,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     setLoading(true);
     try {
       const [articlesData, categoriesData, sousCategoriesData] = await Promise.all([
-        ApiService.getArticles(),
-        ApiService.getCategories(),
-        ApiService.getSousCategories()
+        getArticles(token || undefined),
+        getCategories(token || undefined),
+        getSousCategories(token || undefined)
       ]);
 
       setArticles(articlesData);
@@ -279,7 +285,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   }, [articles]);
 
   const handleAddArticle = () => {
-    if (!canModify) {
+    if (!canModifyArticles) {
       toast({
         title: "Accès refusé",
         description: "Vous n'avez pas les permissions pour ajouter des articles",
@@ -292,7 +298,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   const handleEditArticle = (article: Article) => {
-    if (!canModify) {
+    if (!canModifyArticles) {
       toast({
         title: "Accès refusé",
         description: "Vous n'avez pas les permissions pour modifier des articles",
@@ -305,7 +311,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   const handleDeleteArticle = async (id: number) => {
-    if (!canModify) {
+    if (!canDeleteArticles) {
       toast({
         title: "Accès refusé",
         description: "Vous n'avez pas les permissions pour supprimer des articles",
@@ -317,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) {
       try {
         setLoading(true);
-        await ApiService.deleteArticle(id);
+        await deleteArticle(id);
         await loadData();
         toast({
           title: "Article supprimé",
@@ -339,21 +345,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     try {
       setLoading(true);
       if ('id' in articleData && articleData.id) {
-        await ApiService.updateArticle({
-          ...articleData,
-          dernier_modifie_par: user.nom_complet,
-          date_modification: new Date().toISOString()
-        });
+        await updateArticle(articleData);
         toast({
           title: "Article modifié",
           description: "L'article a été modifié avec succès",
         });
       } else {
-        await ApiService.addArticle({
-          ...articleData,
-          dernier_modifie_par: user.nom_complet,
-          date_modification: new Date().toISOString()
-        });
+        await createArticle(articleData);
         toast({
           title: "Article ajouté",
           description: "L'article a été ajouté avec succès",
@@ -406,6 +404,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     });
   };
 
+  const openUserManagement = () => {
+    if (canManageUsers) {
+      setIsUserManagementOpen(true);
+    } else {
+      toast({
+        title: "Accès refusé",
+        description: "Vous n'avez pas les permissions nécessaires pour gérer les utilisateurs",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Show loading state
   if (loading && articles.length === 0) {
     return (
@@ -415,6 +425,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <p className="mt-4 text-gray-600 dark:text-gray-400">Connexion au serveur...</p>
           <p className="mt-2 text-sm text-gray-500">Assurez-vous que FastAPI fonctionne sur http://localhost:8000</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <div>Chargement...</div>;
+  }
+
+  if (!canViewArticles) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Accès Refusé</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="mb-4">Vous n'avez pas les permissions nécessaires pour accéder à cette section.</p>
+            <p className="text-sm text-gray-600 mb-4">
+              Rôle actuel: <Badge variant="outline">{user.role_display_name}</Badge>
+            </p>
+            <Button onClick={logout} variant="outline">
+              Se déconnecter
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -470,7 +505,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onLogout}
+                onClick={logout}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -547,7 +582,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {canModify && (
+          {canModifyArticles && (
             <Button onClick={handleAddArticle} className="bg-orange-500 hover:bg-orange-600">
               <Plus className="h-4 w-4 mr-2" />
               Nouvel Article
@@ -585,16 +620,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           <Button
             variant="outline"
             onClick={() => setIsCategoryManagementOpen(true)}
-            disabled={!canModify}
+            disabled={!canManageCategories}
           >
             <FolderTree className="h-4 w-4 mr-2" />
             Gérer les catégories
           </Button>
 
-          {isAdmin && (
+          {canManageUsers && (
             <Button
               variant="outline"
-              onClick={() => setIsUserManagementOpen(true)}
+              onClick={openUserManagement}
               className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
             >
               <Users className="h-4 w-4 mr-2" />
@@ -616,7 +651,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
             Exporter DB
           </Button>
 
-          {canModify && (
+          {canModifyArticles && (
             <Button variant="outline" onClick={() => document.getElementById('import-file')?.click()}>
               <Upload className="h-4 w-4 mr-2" />
               Importer DB
@@ -657,7 +692,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                           )}
                         </div>
                       </CardTitle>
-                      {canModify && (
+                      {canModifyArticles && (
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
@@ -722,7 +757,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         ) : (
           <TableView
             articles={filteredArticles}
-            canModify={canModify}
+            canModify={canModifyArticles}
             onEditArticle={handleEditArticle}
             onDeleteArticle={handleDeleteArticle}
             formatPrice={formatPrice}
@@ -737,9 +772,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 Aucun article trouvé.
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                {articles.length === 0
-                  ? "Connectez-vous à votre base de données PostgreSQL via FastAPI"
-                  : "Modifiez vos filtres de recherche"}
+                {canModifyArticles
+                  ? "Commencez par ajouter votre premier article."
+                  : "Aucun article disponible pour le moment."
+                }
               </p>
             </CardContent>
           </Card>
@@ -762,7 +798,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         onCategoriesUpdated={loadData}
       />
 
-      {isAdmin && (
+      {canManageUsers && (
         <UserManagement
           isOpen={isUserManagementOpen}
           onClose={() => setIsUserManagementOpen(false)}

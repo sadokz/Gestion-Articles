@@ -1,59 +1,47 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DatabaseService } from '../services/DatabaseService';
-import { ExtendedUser } from '../types/User';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onLogin: (user: ExtendedUser) => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => {
-  const [username, setUsername] = useState('');
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const { login, isLoading } = useAuth();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     try {
-      const user = await DatabaseService.authenticateUser(username, password);
-      if (user) {
-        onLogin(user);
-        onClose();
-        toast({
-          title: "Connexion réussie",
-          description: `Bienvenue ${user.nom_complet}`,
-        });
-      } else {
-        toast({
-          title: "Erreur de connexion",
-          description: "Nom d'utilisateur ou mot de passe incorrect, ou compte inactif",
-          variant: "destructive",
-        });
-      }
+      await login({ email, password });
+      onClose();
+      toast({
+        title: "Connexion réussie",
+        description: "Bienvenue dans le système de gestion",
+      });
     } catch (error) {
       toast({
-        title: "Erreur",
-        description: "Une erreur est survenue lors de la connexion",
+        title: "Erreur de connexion",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleClose = () => {
-    setUsername('');
+    setEmail('');
     setPassword('');
+    setShowPassword(false);
     onClose();
   };
 
@@ -78,28 +66,43 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Nom d'utilisateur</Label>
+            <Label htmlFor="email">Email</Label>
             <Input
-              id="username"
-              type="text"
-              placeholder="admin"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              id="email"
+              type="email"
+              placeholder="votre@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               className="transition-all duration-200 focus:ring-2 focus:ring-orange-500"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mot de passe</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="admin"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="transition-all duration-200 focus:ring-2 focus:ring-orange-500"
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Votre mot de passe"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="transition-all duration-200 focus:ring-2 focus:ring-orange-500 pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </div>
           <Button
             type="submit"
@@ -109,14 +112,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
             {isLoading ? 'Connexion...' : 'Se connecter'}
           </Button>
         </form>
-
-        <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-            <strong>Compte par défaut :</strong><br />
-            Utilisateur : admin<br />
-            Mot de passe : admin
-          </p>
-        </div>
       </DialogContent>
     </Dialog>
   );

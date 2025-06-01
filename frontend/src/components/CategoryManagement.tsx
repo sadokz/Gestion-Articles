@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DatabaseService } from '../services/DatabaseService';
+import { getCategories, getSousCategories, createCategory, updateCategory, deleteCategory, createSousCategorie, updateSousCategorie, deleteSousCategorie } from '../api';
 import { Categorie, SousCategorie } from '../types/Article';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, Folder, FolderOpen } from 'lucide-react';
 
@@ -23,6 +23,7 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({
   onClose,
   onCategoriesUpdated
 }) => {
+  const { token } = useAuth();
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [sousCategories, setSousCategories] = useState<SousCategorie[]>([]);
   const [isEditingCategory, setIsEditingCategory] = useState(false);
@@ -40,16 +41,18 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && token) {
       loadData();
     }
-  }, [isOpen]);
+  }, [isOpen, token]);
 
   const loadData = async () => {
+    if (!token) return;
+
     try {
       const [categoriesData, sousCategoriesData] = await Promise.all([
-        DatabaseService.getCategories(),
-        DatabaseService.getSousCategories()
+        getCategories(token),
+        getSousCategories(token)
       ]);
       setCategories(categoriesData);
       setSousCategories(sousCategoriesData);
@@ -76,18 +79,17 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({
   };
 
   const handleSaveCategory = async () => {
+    if (!token) return;
+
     try {
       if (editingCategory) {
-        await DatabaseService.updateCategory({
-          ...editingCategory,
-          ...categoryForm
-        });
+        await updateCategory(editingCategory.id!, categoryForm.nom, categoryForm.description, token);
         toast({
           title: "Catégorie modifiée",
           description: "La catégorie a été modifiée avec succès",
         });
       } else {
-        await DatabaseService.addCategory(categoryForm);
+        await createCategory(categoryForm.nom, categoryForm.description, token);
         toast({
           title: "Catégorie ajoutée",
           description: "La catégorie a été ajoutée avec succès",
@@ -106,9 +108,11 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({
   };
 
   const handleDeleteCategory = async (category: Categorie) => {
+    if (!token || !category.id) return;
+
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer la catégorie "${category.nom}" ?`)) {
       try {
-        await DatabaseService.deleteCategory(category.id!);
+        await deleteCategory(category.id, token);
         toast({
           title: "Catégorie supprimée",
           description: "La catégorie a été supprimée avec succès",
@@ -142,18 +146,17 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({
   };
 
   const handleSaveSousCategory = async () => {
+    if (!token) return;
+
     try {
       if (editingSousCategory) {
-        await DatabaseService.updateSousCategory({
-          ...editingSousCategory,
-          ...sousCategoryForm
-        });
+        await updateSousCategorie(editingSousCategory.id!, sousCategoryForm.nom, sousCategoryForm.categorie, sousCategoryForm.description, token);
         toast({
           title: "Sous-catégorie modifiée",
           description: "La sous-catégorie a été modifiée avec succès",
         });
       } else {
-        await DatabaseService.addSousCategory(sousCategoryForm);
+        await createSousCategorie(sousCategoryForm.nom, sousCategoryForm.categorie, sousCategoryForm.description, token);
         toast({
           title: "Sous-catégorie ajoutée",
           description: "La sous-catégorie a été ajoutée avec succès",
@@ -172,9 +175,11 @@ export const CategoryManagement: React.FC<CategoryManagementProps> = ({
   };
 
   const handleDeleteSousCategory = async (sousCategory: SousCategorie) => {
+    if (!token || !sousCategory.id) return;
+
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer la sous-catégorie "${sousCategory.nom}" ?`)) {
       try {
-        await DatabaseService.deleteSousCategory(sousCategory.id!);
+        await deleteSousCategorie(sousCategory.id, token);
         toast({
           title: "Sous-catégorie supprimée",
           description: "La sous-catégorie a été supprimée avec succès",
